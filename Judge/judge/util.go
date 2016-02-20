@@ -9,7 +9,7 @@ import (
     "strings"
     "errors"
     "bytes"
-    "time"
+    "os/exec"
 )
 
 func containerExist(containerName string) bool {
@@ -37,7 +37,7 @@ func containerExist(containerName string) bool {
     return true
 }
 
-func containerLaunch(containerName, remoteServer, remoteAlias string) error {
+func containerLaunch(containerName, remoteServer, remoteAlias string) (error, string) {
     cli := unix.NewClient("")
     var client *http.Client         //For editor VSCode recognize
     client = cli
@@ -45,32 +45,27 @@ func containerLaunch(containerName, remoteServer, remoteAlias string) error {
     post := fmt.Sprintf(str, containerName, remoteServer, remoteAlias)
     re, err := client.Post("http://unix.socket/1.0/containers", "application/json", strings.NewReader(post))
     if err != nil {
-        return err
+        return err, ""
     }
     defer re.Body.Close()
     bytes, err := ioutil.ReadAll(re.Body)
     if err != nil {
-        return err
+        return err, ""
     }
     var response map[string]interface{}
     err = json.Unmarshal(bytes, &response)
     if err != nil {
-        return err
+        return err, ""
     }
     code, ok := response["status_code"]
     if !ok || code.(float64) != 100 {
-        return errors.New(response["error"].(string))
+        return errors.New(response["error"].(string)), ""
     }
-    return nil
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
 }
 
-func waitForLaunch(containerName string) {
-    for !containerExist(containerName) {
-        //Waiting...
-    }
-}
-
-func containerCopy(templateName, containerName string) error {
+func containerCopy(templateName, containerName string) (error, string) {
     cli := unix.NewClient("")
     var client *http.Client         //For editor VSCode recognize
     client = cli
@@ -78,36 +73,30 @@ func containerCopy(templateName, containerName string) error {
     post := fmt.Sprintf(str, containerName, templateName)
     re, err := client.Post("http://unix.socket/1.0/containers", "application/json", strings.NewReader(post))
     if err != nil {
-        return err
+        return err, ""
     }
     defer re.Body.Close()
     bytes, err := ioutil.ReadAll(re.Body)
     if err != nil {
-        return err
+        return err, ""
     }
     var response map[string]interface{}
     err = json.Unmarshal(bytes, &response)
     if err != nil {
-        return err
+        return err, ""
     }
     code, ok := response["status_code"]
     if !ok || code.(float64) != 100 {
-        return errors.New(response["error"].(string))
+        return errors.New(response["error"].(string)), ""
     }
-    return nil
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
 }
 
-func containerLaunchAndWait(containerName, remoteServer, remoteAlias string) error {
-    if err := containerLaunch(containerName, remoteServer, remoteAlias); err != nil {
-        return err
-    }
-    waitForLaunch(containerName)
-    return nil
-}
 
-func containerStart(containerName string) error{
+func containerStart(containerName string) (error, string){
     if !containerExist(containerName) {
-        return errors.New("Container not exist!")
+        return errors.New("Container not exist!"), ""
     }
     cli := unix.NewClient("")
     var client *http.Client         //For editor VSCode recognize
@@ -119,42 +108,28 @@ func containerStart(containerName string) error{
             }`
     req,err := http.NewRequest("PUT", "http://unix.socket/1.0/containers/" + containerName + "/state", strings.NewReader(str))
     if err != nil {
-        return err
+        return err, ""
     }
     re, err := client.Do(req)
     if err != nil {
-        return err
+        return err, ""
     }
     defer re.Body.Close()
     bytes, err := ioutil.ReadAll(re.Body)
     if err != nil {
-        return err
+        return err, ""
     }
     var response map[string]interface{}
     err = json.Unmarshal(bytes, &response)
     if err != nil {
-        return err
+        return err, ""
     }
     code, ok := response["status_code"]
     if !ok || code.(float64) != 100 {
-        return errors.New(response["error"].(string))
+        return errors.New(response["error"].(string)), ""
     }
-    return nil
-}
-
-//Ensure the container start
-//When it exist, it is not ready to start
-func containerStartConfirmed(containerName string) {
-    retry:
-    containerStart(containerName)
-    start := time.Now().UnixNano()
-    for state, _, _ := containerState(containerName);state != "Running";{
-        //waiting
-        if time.Now().UnixNano() - start > 3 * 1024 * 1024 * 1024 {
-            //fmt.Println("retry to start")
-            goto retry
-        }
-    }
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
 }
 
 func containerState(containerName string) (state string, ips []string, err error) {
@@ -209,13 +184,6 @@ func containerState(containerName string) (state string, ips []string, err error
     return
 }
 
-func waitForStart(containerName string) {
-    state, _, _ := containerState(containerName)
-    for state != "Running" {
-        state, _, _ = containerState(containerName)
-    }
-}
-
 //Sync
 func containerPush(containerName string, filePath string, fileBytes []byte) error {
     cli := unix.NewClient("")
@@ -237,7 +205,7 @@ func containerPush(containerName string, filePath string, fileBytes []byte) erro
     return nil
 }
 
-func containerSnapshot(containerName string, snapshot string) error {
+func containerSnapshot(containerName string, snapshot string) (error, string) {
     cli := unix.NewClient("")
     var client *http.Client
     client = cli
@@ -250,23 +218,24 @@ func containerSnapshot(containerName string, snapshot string) error {
     post := fmt.Sprintf(str, snapshot)
     re, err := client.Post("http://unix.socket/1.0/containers/" + containerName + "/snapshots", "application/json", strings.NewReader(post))
     if err != nil {
-        return err
+        return err, ""
     }
     defer re.Body.Close()
     bytes, err := ioutil.ReadAll(re.Body)
     if err != nil {
-        return err
+        return err, ""
     }
     var response map[string]interface{}
     err = json.Unmarshal(bytes, &response)
     if err != nil {
-        return err
+        return err, ""
     }
     code, ok := response["status_code"]
     if !ok || code.(float64) != 100 {
-        return errors.New(response["error"].(string))
+        return errors.New(response["error"].(string)), ""
     }
-    return nil
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
 }
 
 func containerSnapshotReady(containerName string, snapshot string) bool {
@@ -294,9 +263,9 @@ func containerSnapshotReady(containerName string, snapshot string) bool {
     return true
 }
 
-func containerRestore(containerName string, snapshot string) error {
+func containerRestore(containerName string, snapshot string) (error, string) {
     if !containerExist(containerName) {
-        return errors.New("Container not exist!")
+        return errors.New("Container not exist!"), ""
     }
     cli := unix.NewClient("")
     var client *http.Client         //For editor VSCode recognize
@@ -307,25 +276,85 @@ func containerRestore(containerName string, snapshot string) error {
     post := fmt.Sprintf(str, snapshot)
     req,err := http.NewRequest("PUT", "http://unix.socket/1.0/containers/" + containerName, strings.NewReader(post))
     if err != nil {
-        return err
+        return err, ""
     }
     re, err := client.Do(req)
     if err != nil {
-        return err
+        return err, ""
     }
     defer re.Body.Close()
     bytes, err := ioutil.ReadAll(re.Body)
     if err != nil {
-        return err
+        return err, ""
     }
     var response map[string]interface{}
     err = json.Unmarshal(bytes, &response)
     if err != nil {
-        return err
+        return err, ""
     }
     code, ok := response["status_code"]
     if !ok || code.(float64) != 100 {
-        return errors.New(response["error"].(string))
+        return errors.New(response["error"].(string)), ""
     }
-    return nil
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
+}
+
+func containerExec(containerName string, command []string) (error, string) {
+    cli := unix.NewClient("")
+    var client *http.Client         //For editor VSCode recognize
+    client = cli
+    str := `
+    {
+        "command": %s,       
+        "environment": {},              
+        "wait-for-websocket": false,    
+        "interactive": true            
+    }
+    `
+    commands, err := json.Marshal(&command)
+    if err != nil {
+        return err, ""
+    }
+    post := fmt.Sprintf(str, string(commands))
+    re, err := client.Post("http://unix.socket/1.0/containers/" + containerName + "/exec", "application/json", strings.NewReader(post))
+    if err != nil {
+        return err, ""
+    }
+    defer re.Body.Close()
+    bytes, err := ioutil.ReadAll(re.Body)
+    if err != nil {
+        return err, ""
+    }
+    var response map[string]interface{}
+    err = json.Unmarshal(bytes, &response)
+    if err != nil {
+        return err, ""
+    }
+    code, ok := response["status_code"]
+    if !ok || code.(float64) != 100 {
+        return errors.New(response["error"].(string)), ""
+    }
+    uuid := response["metadata"].(map[string]interface{})["id"].(string)
+    return nil, uuid
+}
+
+func wait(uuid string) {
+    cli := unix.NewClient("")
+    var client *http.Client
+    client = cli
+    re, _ := client.Get("http://unix.socket/1.0/operations/" + uuid + "/wait")
+    defer re.Body.Close()
+    // bytes, _ := ioutil.ReadAll(re.Body)
+    // fmt.Println(string(bytes))
+}
+
+//Sync
+func aptExec(containnerName string, command []string) {
+    command = append([]string{"exec", containnerName},  command...)
+    var out bytes.Buffer
+    cmd := exec.Command("lxc", command...)
+    cmd.Stderr = &out
+    cmd.Run()
+    fmt.Println(out.String())
 }

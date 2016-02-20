@@ -1,8 +1,14 @@
 package main
 import (
     "./judge"
+    "flag"
+    _"net/http"
 )
 
+var compilerCNum = flag.Int("c", 5, "C Compilers Num")
+
 func main() {
-    judge.TestJudge.Init("ubuntu2", "htts://images.linuxcontainers.org:8443", "ubuntu/trusty/amd64", 1)
+    flag.Parse()
+    judge.NewJudgeHubC(*compilerCNum)
+    //TODO: Add HTTP Listen
 }

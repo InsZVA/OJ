@@ -10,12 +10,10 @@ Then it will tell me whether the source was accepted or compiler error, (even ti
 
 You must use HTTP POST request like this for request body:
 ```
-{
-    "problemId":2,
-    "api":"http://127.0.0.1:1234/problem/",
-    "compiler":"gcc",
-    "submission":"#include <stdio.h>\nint main()\n{\nprintf("Hello world!");\nreturn 0;\n}"
-}
+    problemId=2&
+    api=http://127.0.0.1:1234/problem/"&
+    compiler=gcc&
+    submission=#include <stdio.h>%10int main()%10{%10printf("Hello world!");%10return 0;%10}"&
 ```
 The api address is that will be call by Judge with adding problemId to its end to get Standard Input And Answer of this problem.
 For above, the judge will call `http://127.0.0.1:1234/problem/2` to find informations.So the api address must response somting like below:
