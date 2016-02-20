@@ -46,7 +46,7 @@ func (this *StdCheck) GetStandardInOut() error {
     if err != nil {
         return err
     }
-    if code, ok := jsonData["code"].(int);ok && code != 0 {
+    if code, ok := jsonData["code"].(float64);ok && code != 0 {
         msg, ok := jsonData["msg"].(string)
         if ok {
             return errors.New(msg)
