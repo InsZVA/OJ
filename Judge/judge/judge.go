@@ -3,6 +3,10 @@ package judge
 import (
     "io/ioutil"
     "fmt"
+    "time"
+    "net/http"
+    "net/url"
+    "bytes"
 )
 
 const daemon_path = "./daemon"
@@ -74,6 +78,10 @@ func (this *Judge) Init(lxcTemplateName, lxcRemoteServer, lxcRemoteAlias string)
 func (this *Judge) Run() {
     _, uuid := containerStart(this.containerName)
     wait(uuid)
+    _, uuid = containerExec(this.containerName, []string{"chmod", "777", "/daemon"})
+    wait(uuid)
+    _, uuid = containerExec(this.containerName, []string{"/daemon"})
+    time.Sleep(2 * 1000 * time.Millisecond)
 }
 
 func (this *Judge) Restore() {
@@ -106,4 +114,50 @@ func NewJudgeHub(lxcTemlateName, lxcRemoteServer, lxcRemoteAlias string, lxcMaxN
         autoIncreament:     1,
         lxcTemplateName:    lxcTemlateName,
     }    
+}
+
+
+func (this *JudgeHub) Check(problemId string, compiler string, api string, submission string, notify string) {
+    retry:
+    //Peek a free Judge
+    var selectedJudge LXCer
+    for selectedJudge == nil {
+        for _, judge := range this.lxcs {
+            if !judge.Working() {
+                selectedJudge = judge
+                break
+            }
+        }
+    }
+    //TODO: notify the judge begin
+    selectedJudge.SetWorking(true)
+    //TODO: command Judge To Judge
+    data := make(url.Values)
+    data["porblemId"] = []string{problemId}
+    data["compiler"] = []string{compiler}
+    data["api"] = []string{api}
+    data["submission"] = []string{submission}
+    http.Get(notify + "/problem/" + problemId + "/start")   //notify Start
+    res, err := http.PostForm("http://" + selectedJudge.IP() + ":1996/judge", data)
+    if err != nil {
+        //This conttainer might occur an error
+        go func(selectedJudge LXCer) {
+            selectedJudge.Restore()
+            selectedJudge.Run()
+            selectedJudge.SetWorking(false)
+        }(selectedJudge)
+        //Another try
+        selectedJudge = nil
+        goto retry
+    }
+    defer res.Body.Close()
+    result, _ := ioutil.ReadAll(res.Body)
+    //Restore selected judge
+    go func(selectedJudge LXCer) {
+            selectedJudge.Restore()
+            selectedJudge.Run()
+            selectedJudge.SetWorking(false)
+        }(selectedJudge)
+    //Notify the result
+    http.Post(notify + "/problem/" + problemId + "/result", "application/json", bytes.NewReader(result))
 }

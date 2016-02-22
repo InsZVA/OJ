@@ -9,15 +9,20 @@ Judge Manager will install the replyment packages and softwares automatically, a
 
 ## Usage
 
-Befor Run Judge Manager, you must install lxd first:
+Before Run Judge Manager, you must install lxd first:
 ```
 sudo add-apt-repository ppa:ubuntu-lxc/lxd-git-master && sudo apt-get update
 sudo apt-get install lxd
+lxd init
+```
+And add image source:
+```
+lxc remote add images images.linuxcontainers.org
 ```
 
 And then run Judge Manager is ok.
 
-Judge Manager listen to http://127.0.0.1:2020 and it accept request body like below:
+Judge Manager listen to http://127.0.0.1:2020/ and it accept request body like below:
 ```
     problemId=2&
     api=http://127.0.0.1:1234/problem/"&

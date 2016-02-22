@@ -10,6 +10,11 @@ type JudgeC struct {
 func (this *JudgeC) Init(lxcTemplateName, lxcRemoteServer, lxcRemoteAlias string) {
     this.Judge.Init(lxcTemplateName, lxcRemoteServer, lxcRemoteAlias)
     if this.containerName != lxcTemplateName {
+        _, ips, _ := containerState(this.containerName)
+        fmt.Println("Starting daemon on ", this.containerName, " ip: ", ips[0])
+        _, uuid := containerExec(this.containerName, []string{"chmod", "777", "/daemon"})
+        wait(uuid)
+        _, uuid = containerExec(this.containerName, []string{"/daemon"})
         return
     }
     fmt.Println("Wait 3000 ms")

@@ -2,7 +2,7 @@ package judge
 
 import "testing"
 import "fmt"
-/*
+
 func Test_containerLaunch(t *testing.T) {
     err, uuid := containerLaunch("ubuntu2", "https://images.linuxcontainers.org:8443", "ubuntu/trusty/amd64")
     if err != nil {
@@ -64,7 +64,7 @@ func Test_containerRestore(t *testing.T) {
      wait(uuid)
      fmt.Println("Restore that snapshot on ubuntu2")
 }
-*/
+
 func Test_containerExec(t *testing.T) {
      _, uuid := containerStart("ubuntu2")
      wait(uuid)
